@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xmlns:context="http://www.springframework.org/schema/context"
+     xmlns:aop="http://www.springframework.org/schema/aop"
+     xmlns:tx="http://www.springframework.org/schema/tx"
+     xmlns:task="http://www.springframework.org/schema/task"
+     xsi:schemaLocation="http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context
+        http://www.springframework.org/schema/context/spring-context.xsd
+        http://www.springframework.org/schema/aop
+        http://www.springframework.org/schema/aop/spring-aop.xsd
+        http://www.springframework.org/schema/tx
+        http://www.springframework.org/schema/tx/spring-tx.xsd
+        ">
+        
+       <!--   <context:property-placeholder location="classpath:jdbc.properties"/>-->
+        
+        <!-- 数组方式加载properties配置文件 -->
+        <bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+            <property name="locations">
+                <list>
+                  <value>classpath:jdbc.properties</value>
+                </list>
+            </property>
+        </bean>
+        
+        
+        <!-- 配置Druid数据源 -->
+        <bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource" init-method="init" 
+            destroy-method="close">   
+		    <property name="url" value="${url}" />  
+		    <property name="username" value="${username}" />  
+		    <property name="password" value="${password}" />  
+        </bean>
+		
+		<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">  
+	        <property name="dataSource" ref="dataSource" />  
+	        
+	        <!-- 自动扫描mapping.xml文件 -->  
+	        <property name="configLocation" value="classpath:mybatis-config.xml"></property>
+	        <property name="mapperLocations" value="classpath:mappers/*.xml"></property>
+        </bean>  
+    
+      
+	    <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+	         <property name="basePackage" value="com.ssm"></property>
+	         <property name="sqlSessionFactoryBeanName" value="sqlSessionFactory"></property>
+	     </bean> 
+
+        <!-- 配置事物管理器 -->
+	    <bean id="transactionManager"  class="org.springframework.jdbc.datasource.DataSourceTransactionManager">  
+	        <property name="dataSource" ref="dataSource" />  
+	    </bean>      
+    
+	    <!-- 开启事物注解驱动 -->
+        <tx:annotation-driven transaction-manager="transactionManager"/>
+        
+        <!-- 配置relam -->
+	    <bean id="shiroRealm" class="com.ssm.shiro.ShiroRealm"/>
+	    
+        <!-- 配置shiro安全管理器 -->
+        <bean id="securityManager" class="org.apache.shiro.web.mgt.DefaultWebSecurityManager">
+           <property name="cacheManager" ref="cacheManager" />    
+           <property name="realm" ref="shiroRealm"></property>
+           <property name="rememberMeManager" ref="cookieRememberMeManager"></property>
+        </bean>
+	    
+	    <!-- 保证实现了Shiro内部lifecycle函数的bean执行 -->    
+        <bean id="lifecycleBeanPostProcessor" class="org.apache.shiro.spring.LifecycleBeanPostProcessor"/> 
+	    <!-- 开启Shiro注解 -->  
+        <bean class="org.springframework.aop.framework.autoproxy.DefaultAdvisorAutoProxyCreator" depends-on="lifecycleBeanPostProcessor"/>    
+        <bean class="org.apache.shiro.spring.security.interceptor.AuthorizationAttributeSourceAdvisor">    
+            <property name="securityManager" ref="securityManager"/>    
+        </bean> 
+       
+        
+        <!-- ehcache缓存配置 -->
+        <bean id="cacheManager" class="org.apache.shiro.cache.ehcache.EhCacheManager">
+	        <property name="cacheManagerConfigFile" value="classpath:ehcache.xml" />
+	    </bean>
+	    
+	    <!-- 配置shiro cookie -->
+	    <bean id="cookieRememberMeManager" class="org.apache.shiro.web.mgt.CookieRememberMeManager" >
+	        <property name="cookie" ref="cookie"></property>
+	    </bean>
+	    
+	    <bean class="com.ssm.aspect.AspectLog"></bean>
+	    <bean class="org.apache.shiro.web.servlet.SimpleCookie" id="cookie">
+	       <constructor-arg value="rememberMe"/>
+	       <property name="maxAge" value="1000000"></property>
+	    </bean>
+	    
+	    
+	    
+         <!-- Shiro过滤器 -->  
+        <bean id="shiroFilter" class="org.apache.shiro.spring.web.ShiroFilterFactoryBean">
+           <property name="securityManager" ref="securityManager"></property>
+           <!-- 登录url -->
+           <property name="loginUrl" value="/"></property>
+           <!-- 未认证跳转的url -->
+           <property name="unauthorizedUrl" value="/"></property>
+           <!-- 过滤链 -->
+           <property name="filterChainDefinitions">
+               <value>
+                <!--   /login  = anon
+                  /* = authc --> 
+               </value>
+           </property>
+        </bean>
+        
+        <!--  
+        <bean id="aspectLog" class="com.ssm.aspect.AspectLog"></bean>
+        
+        
+        <aop:config>
+          <aop:aspect ref="aspectLog">
+            <aop:pointcut expression="execution(* com.ssm.controller.LoginController.*(..))" id="pointcut"/>
+            <aop:before method="before" pointcut-ref="pointcut"/>
+          </aop:aspect>
+        </aop:config>-->
+</beans>
